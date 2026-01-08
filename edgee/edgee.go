@@ -21,11 +21,11 @@ const (
 
 // Message represents a chat message
 type Message struct {
-	Role         string      `json:"role"`
-	Content      string      `json:"content,omitempty"`
-	Name         *string     `json:"name,omitempty"`
-	ToolCalls    []ToolCall  `json:"tool_calls,omitempty"`
-	ToolCallID   *string     `json:"tool_call_id,omitempty"`
+	Role       string     `json:"role"`
+	Content    string     `json:"content,omitempty"`
+	Name       *string    `json:"name,omitempty"`
+	ToolCalls  []ToolCall `json:"tool_calls,omitempty"`
+	ToolCallID *string    `json:"tool_call_id,omitempty"`
 }
 
 // ToolCall represents a function call request from the model
@@ -56,9 +56,9 @@ type FunctionDefinition struct {
 
 // InputObject represents structured input for chat completion
 type InputObject struct {
-	Messages   []Message              `json:"messages"`
-	Tools      []Tool                 `json:"tools,omitempty"`
-	ToolChoice interface{}            `json:"tool_choice,omitempty"` // string or object
+	Messages   []Message   `json:"messages"`
+	Tools      []Tool      `json:"tools,omitempty"`
+	ToolChoice interface{} `json:"tool_choice,omitempty"` // string or object
 }
 
 // ChatCompletionRequest represents the request body for chat completions
