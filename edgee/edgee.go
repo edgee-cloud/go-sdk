@@ -270,38 +270,6 @@ func (c *Client) Stream(model string, input interface{}) (<-chan *StreamChunk, <
 	return streamResult.ChunkChan, streamResult.ErrChan
 }
 
-// StreamText sends a streaming request and returns only text content (convenience method)
-func (c *Client) StreamText(model string, input interface{}) (<-chan string, <-chan error) {
-	textChan := make(chan string, 10)
-	errChan := make(chan error, 1)
-
-	chunkChan, chunkErrChan := c.Stream(model, input)
-
-	go func() {
-		defer close(textChan)
-		defer close(errChan)
-
-		for {
-			select {
-			case chunk, ok := <-chunkChan:
-				if !ok {
-					return
-				}
-				if text := chunk.Text(); text != "" {
-					textChan <- text
-				}
-			case err, ok := <-chunkErrChan:
-				if ok && err != nil {
-					errChan <- err
-					return
-				}
-			}
-		}
-	}()
-
-	return textChan, errChan
-}
-
 func (c *Client) buildRequest(model string, input interface{}, stream bool) (*ChatCompletionRequest, error) {
 	req := &ChatCompletionRequest{
 		Model:  model,
