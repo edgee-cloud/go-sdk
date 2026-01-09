@@ -88,31 +88,7 @@ if toolCalls := response.ToolCalls(); len(toolCalls) > 0 {
 
 ### Streaming
 
-#### Simple Text Streaming
-
-The simplest way to stream text responses:
-
-```go
-textChan, errChan := client.StreamText("gpt-4o", "Tell me a story")
-
-for {
-    select {
-    case text, ok := <-textChan:
-        if !ok {
-            return
-        }
-        fmt.Print(text)
-    case err := <-errChan:
-        if err != nil {
-            log.Fatal(err)
-        }
-    }
-}
-```
-
-#### Streaming with More Control
-
-Access chunk properties when you need more control:
+Access chunk properties for streaming:
 
 ```go
 chunkChan, errChan := client.Stream("gpt-4o", "Tell me a story")

@@ -79,31 +79,9 @@ func main() {
 	}
 	fmt.Println()
 
-	// Test 4: Streaming (simplest way - text only)
-	fmt.Println("Test 4: Streaming (text only)")
-	textChan, errChan := client.StreamText("mistral/mistral-small-latest", "Tell me a short story about a robot")
-	for {
-		select {
-		case text, ok := <-textChan:
-			if !ok {
-				fmt.Println()
-				goto nextTest
-			}
-			fmt.Print(text)
-		case err := <-errChan:
-			if err != nil {
-				log.Printf("Error: %v\n", err)
-				goto nextTest
-			}
-		}
-	}
-
-nextTest:
-	fmt.Println()
-
-	// Test 5: Streaming with more control
-	fmt.Println("Test 5: Streaming with more control")
-	chunkChan, errChan2 := client.Stream("mistral/mistral-small-latest", "What is Go?")
+	// Test 4: Streaming
+	fmt.Println("Test 4: Streaming")
+	chunkChan, errChan := client.Stream("mistral/mistral-small-latest", "What is Go?")
 	for {
 		select {
 		case chunk, ok := <-chunkChan:
@@ -114,7 +92,7 @@ nextTest:
 			if text := chunk.Text(); text != "" {
 				fmt.Print(text)
 			}
-		case err := <-errChan2:
+		case err := <-errChan:
 			if err != nil {
 				log.Printf("Error: %v\n", err)
 				return
