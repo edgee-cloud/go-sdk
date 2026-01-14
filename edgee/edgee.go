@@ -49,40 +49,46 @@ type Tool struct {
 
 // FunctionDefinition defines a function tool
 type FunctionDefinition struct {
-	Name        string                 `json:"name"`
-	Description *string                `json:"description,omitempty"`
-	Parameters  map[string]interface{} `json:"parameters,omitempty"`
+	Name        string         `json:"name"`
+	Description *string        `json:"description,omitempty"`
+	Parameters  map[string]any `json:"parameters,omitempty"`
 }
 
 // InputObject represents structured input for chat completion
 type InputObject struct {
-	Messages   []Message   `json:"messages"`
-	Tools      []Tool      `json:"tools,omitempty"`
-	ToolChoice interface{} `json:"tool_choice,omitempty"` // string or object
+	Messages   []Message `json:"messages"`
+	Tools      []Tool    `json:"tools,omitempty"`
+	ToolChoice any       `json:"tool_choice,omitempty"` // string or object
 }
 
-// ChatCompletionRequest represents the request body for chat completions
-type ChatCompletionRequest struct {
-	Model      string      `json:"model"`
-	Messages   []Message   `json:"messages"`
-	Stream     bool        `json:"stream,omitempty"`
-	Tools      []Tool      `json:"tools,omitempty"`
-	ToolChoice interface{} `json:"tool_choice,omitempty"`
+// Request represents the request body for chat completions
+type Request struct {
+	Model      string    `json:"model"`
+	Messages   []Message `json:"messages"`
+	Stream     bool      `json:"stream,omitempty"`
+	Tools      []Tool    `json:"tools,omitempty"`
+	ToolChoice any       `json:"tool_choice,omitempty"`
 }
 
-// ChatCompletionDelta represents a streaming chunk delta
-type ChatCompletionDelta struct {
+// StreamDelta represents a streaming chunk delta
+type StreamDelta struct {
 	Role      *string    `json:"role,omitempty"`
 	Content   *string    `json:"content,omitempty"`
 	ToolCalls []ToolCall `json:"tool_calls,omitempty"`
 }
 
-// ChatCompletionChoice represents a choice in the response
-type ChatCompletionChoice struct {
-	Index        int                  `json:"index"`
-	Message      *Message             `json:"message,omitempty"`
-	Delta        *ChatCompletionDelta `json:"delta,omitempty"`
-	FinishReason *string              `json:"finish_reason,omitempty"`
+// Choice represents a choice in the response
+type Choice struct {
+	Index        int      `json:"index"`
+	Message      *Message `json:"message,omitempty"`
+	FinishReason *string  `json:"finish_reason,omitempty"`
+}
+
+// StreamChoice represents a choice in the streaming response
+type StreamChoice struct {
+	Index        int          `json:"index"`
+	Delta        *StreamDelta `json:"delta,omitempty"`
+	FinishReason *string      `json:"finish_reason,omitempty"`
 }
 
 // Usage represents token usage information
@@ -94,12 +100,12 @@ type Usage struct {
 
 // SendResponse represents the response from a non-streaming request
 type SendResponse struct {
-	ID      string                 `json:"id"`
-	Object  string                 `json:"object"`
-	Created int64                  `json:"created"`
-	Model   string                 `json:"model"`
-	Choices []ChatCompletionChoice `json:"choices"`
-	Usage   *Usage                 `json:"usage,omitempty"`
+	ID      string   `json:"id"`
+	Object  string   `json:"object"`
+	Created int64    `json:"created"`
+	Model   string   `json:"model"`
+	Choices []Choice `json:"choices"`
+	Usage   *Usage   `json:"usage,omitempty"`
 }
 
 // Text returns the text content from the first choice (convenience method)
@@ -136,11 +142,11 @@ func (r *SendResponse) ToolCalls() []ToolCall {
 
 // StreamChunk represents a streaming response chunk
 type StreamChunk struct {
-	ID      string                 `json:"id"`
-	Object  string                 `json:"object"`
-	Created int64                  `json:"created"`
-	Model   string                 `json:"model"`
-	Choices []ChatCompletionChoice `json:"choices"`
+	ID      string         `json:"id"`
+	Object  string         `json:"object"`
+	Created int64          `json:"created"`
+	Model   string         `json:"model"`
+	Choices []StreamChoice `json:"choices"`
 }
 
 // Text returns the text content from the first choice (convenience method)
@@ -183,7 +189,7 @@ type Client struct {
 // - Pass a string to set the API key directly
 // - Pass a *Config to set both API key and base URL
 // - Pass nil to use environment variables (EDGEE_API_KEY, EDGEE_BASE_URL)
-func NewClient(config interface{}) (*Client, error) {
+func NewClient(config any) (*Client, error) {
 	var apiKey, baseURL string
 
 	switch v := config.(type) {
@@ -229,31 +235,28 @@ func NewClient(config interface{}) (*Client, error) {
 // Send sends a chat completion request with flexible input:
 // - Pass a string for simple user input
 // - Pass an InputObject for full control
-// - Pass a map[string]interface{} with "messages", "tools", "tool_choice" keys
-func (c *Client) Send(model string, input interface{}, stream bool) (interface{}, error) {
-	req, err := c.buildRequest(model, input, stream)
+// - Pass a map[string]any with "messages", "tools", "tool_choice" keys
+func (c *Client) Send(model string, input any) (response SendResponse, err error) {
+	req, err := c.buildRequest(model, input, false)
 	if err != nil {
-		return nil, err
+		return
 	}
-
-	if stream {
-		return c.handleStreamingResponse(req)
-	}
-	return c.handleNonStreamingResponse(req)
+	response, err = c.handleNonStreamingResponse(req)
+	return
 }
 
 // ChatCompletion sends a non-streaming chat completion request (convenience method)
-func (c *Client) ChatCompletion(model string, input interface{}) (*SendResponse, error) {
-	result, err := c.Send(model, input, false)
+func (c *Client) ChatCompletion(model string, input any) (response SendResponse, err error) {
+	response, err = c.Send(model, input)
 	if err != nil {
-		return nil, err
+		return
 	}
-	return result.(*SendResponse), nil
+	return
 }
 
 // Stream sends a streaming chat completion request (convenience method)
-func (c *Client) Stream(model string, input interface{}) (<-chan *StreamChunk, <-chan error) {
-	result, err := c.Send(model, input, true)
+func (c *Client) Stream(model string, input any) (<-chan *StreamChunk, <-chan error) {
+	req, err := c.buildRequest(model, input, true)
 	if err != nil {
 		errChan := make(chan error, 1)
 		errChan <- err
@@ -263,15 +266,21 @@ func (c *Client) Stream(model string, input interface{}) (<-chan *StreamChunk, <
 		return chunkChan, errChan
 	}
 
-	streamResult := result.(struct {
-		ChunkChan <-chan *StreamChunk
-		ErrChan   <-chan error
-	})
-	return streamResult.ChunkChan, streamResult.ErrChan
+	result, err := c.handleStreamingResponse(req)
+	if err != nil {
+		errChan := make(chan error, 1)
+		errChan <- err
+		close(errChan)
+		chunkChan := make(chan *StreamChunk)
+		close(chunkChan)
+		return chunkChan, errChan
+	}
+
+	return result.ChunkChan, result.ErrChan
 }
 
-func (c *Client) buildRequest(model string, input interface{}, stream bool) (*ChatCompletionRequest, error) {
-	req := &ChatCompletionRequest{
+func (c *Client) buildRequest(model string, input any, stream bool) (*Request, error) {
+	req := &Request{
 		Model:  model,
 		Stream: stream,
 	}
@@ -288,7 +297,7 @@ func (c *Client) buildRequest(model string, input interface{}, stream bool) (*Ch
 		req.Messages = v.Messages
 		req.Tools = v.Tools
 		req.ToolChoice = v.ToolChoice
-	case map[string]interface{}:
+	case map[string]any:
 		// Map input
 		if messages, ok := v["messages"]; ok {
 			msgBytes, err := json.Marshal(messages)
@@ -318,15 +327,15 @@ func (c *Client) buildRequest(model string, input interface{}, stream bool) (*Ch
 	return req, nil
 }
 
-func (c *Client) handleNonStreamingResponse(req *ChatCompletionRequest) (*SendResponse, error) {
+func (c *Client) handleNonStreamingResponse(req *Request) (response SendResponse, err error) {
 	body, err := json.Marshal(req)
 	if err != nil {
-		return nil, fmt.Errorf("failed to marshal request: %w", err)
+		return response, fmt.Errorf("failed to marshal request: %w", err)
 	}
 
 	httpReq, err := http.NewRequest("POST", c.baseURL+APIEndpoint, bytes.NewReader(body))
 	if err != nil {
-		return nil, fmt.Errorf("failed to create request: %w", err)
+		return response, fmt.Errorf("failed to create request: %w", err)
 	}
 
 	httpReq.Header.Set("Content-Type", "application/json")
@@ -335,24 +344,26 @@ func (c *Client) handleNonStreamingResponse(req *ChatCompletionRequest) (*SendRe
 	client := &http.Client{}
 	resp, err := client.Do(httpReq)
 	if err != nil {
-		return nil, fmt.Errorf("failed to send request: %w", err)
+		return response, fmt.Errorf("failed to send request: %w", err)
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
 		bodyBytes, _ := io.ReadAll(resp.Body)
-		return nil, fmt.Errorf("API error %d: %s", resp.StatusCode, string(bodyBytes))
+		return response, fmt.Errorf("API error %d: %s", resp.StatusCode, string(bodyBytes))
 	}
 
-	var result SendResponse
-	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
-		return nil, fmt.Errorf("failed to decode response: %w", err)
+	if err := json.NewDecoder(resp.Body).Decode(&response); err != nil {
+		return response, fmt.Errorf("failed to decode response: %w", err)
 	}
 
-	return &result, nil
+	return
 }
 
-func (c *Client) handleStreamingResponse(req *ChatCompletionRequest) (interface{}, error) {
+func (c *Client) handleStreamingResponse(req *Request) (struct {
+	ChunkChan <-chan *StreamChunk
+	ErrChan   <-chan error
+}, error) {
 	chunkChan := make(chan *StreamChunk, 10)
 	errChan := make(chan error, 1)
 
