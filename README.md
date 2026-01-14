@@ -1,6 +1,9 @@
-# Edgee Gateway SDK for Go
+# Edgee Go SDK
 
-Lightweight Go SDK for Edgee AI Gateway.
+Lightweight, type-safe Go SDK for the [Edgee AI Gateway](https://www.edgee.cloud).
+
+[![Go Reference](https://pkg.go.dev/badge/github.com/edgee-cloud/go-sdk.svg)](https://pkg.go.dev/github.com/edgee-cloud/go-sdk)
+[![License](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](LICENSE)
 
 ## Installation
 
@@ -8,87 +11,52 @@ Lightweight Go SDK for Edgee AI Gateway.
 go get github.com/edgee-cloud/go-sdk/edgee
 ```
 
-## Usage
+## Quick Start
 
 ```go
-import "github.com/edgee-cloud/go-sdk/edgee"
+package main
 
-// Create client (uses EDGEE_API_KEY environment variable)
-client, err := edgee.NewClient(nil)
+import (
+    "fmt"
+    "log"
+    "github.com/edgee-cloud/go-sdk/edgee"
+)
+
+func main() {
+    client, err := edgee.NewClient("your-api-key")
+    if err != nil {
+        log.Fatal(err)
+    }
+
+    response, err := client.Send("gpt-4o", "What is the capital of France?")
+    if err != nil {
+        log.Fatal(err)
+    }
+
+    fmt.Println(response.Text())
+    // "The capital of France is Paris."
+}
+```
+
+## Send Method
+
+The `Send()` method makes non-streaming chat completion requests:
+
+```go
+response, err := client.Send("gpt-4o", "Hello, world!")
 if err != nil {
     log.Fatal(err)
 }
 
-// Or create with explicit API key
-client, err := edgee.NewClient("your-api-key")
-
-// Or create with full config
-client, err := edgee.NewClient(&edgee.Config{
-    APIKey:  "your-api-key",
-    BaseURL: "https://api.edgee.ai",
-})
+// Access response
+fmt.Println(response.Text())         // Text content
+fmt.Println(response.FinishReason()) // Finish reason
+fmt.Println(response.ToolCalls())    // Tool calls (if any)
 ```
 
-### Simple Input
+## Stream Method
 
-```go
-response, err := client.ChatCompletion("gpt-4o", "What is the capital of France?")
-if err != nil {
-    log.Fatal(err)
-}
-
-fmt.Println(response.Text())
-```
-
-### Full Input with Messages
-
-```go
-response, err := client.ChatCompletion("gpt-4o", map[string]interface{}{
-    "messages": []map[string]string{
-        {"role": "system", "content": "You are a helpful assistant."},
-        {"role": "user", "content": "Hello!"},
-    },
-})
-if err != nil {
-    log.Fatal(err)
-}
-
-fmt.Println(response.Text())
-```
-
-### With Tools
-
-```go
-response, err := client.ChatCompletion("gpt-4o", map[string]interface{}{
-    "messages": []map[string]string{
-        {"role": "user", "content": "What's the weather in Paris?"},
-    },
-    "tools": []map[string]interface{}{
-        {
-            "type": "function",
-            "function": map[string]interface{}{
-                "name":        "get_weather",
-                "description": "Get weather for a location",
-                "parameters": map[string]interface{}{
-                    "type": "object",
-                    "properties": map[string]interface{}{
-                        "location": map[string]string{"type": "string"},
-                    },
-                },
-            },
-        },
-    },
-    "tool_choice": "auto",
-})
-
-if toolCalls := response.ToolCalls(); len(toolCalls) > 0 {
-    fmt.Printf("Tool calls: %+v\n", toolCalls)
-}
-```
-
-### Streaming
-
-Access chunk properties for streaming:
+The `Stream()` method enables real-time streaming responses:
 
 ```go
 chunkChan, errChan := client.Stream("gpt-4o", "Tell me a story")
@@ -102,35 +70,9 @@ for {
         if text := chunk.Text(); text != "" {
             fmt.Print(text)
         }
-    case err := <-errChan:
-        if err != nil {
-            log.Fatal(err)
-        }
-    }
-}
-```
-
-#### Accessing Full Chunk Data
-
-When you need complete access to the streaming response:
-
-```go
-chunkChan, errChan := client.Stream("gpt-4o", "Hello")
-
-for {
-    select {
-    case chunk, ok := <-chunkChan:
-        if !ok {
-            return
-        }
-        if role := chunk.Role(); role != "" {
-            fmt.Printf("Role: %s\n", role)
-        }
-        if text := chunk.Text(); text != "" {
-            fmt.Print(text)
-        }
+        
         if reason := chunk.FinishReason(); reason != "" {
-            fmt.Printf("\nFinish: %s\n", reason)
+            fmt.Printf("\nFinished: %s\n", reason)
         }
     case err := <-errChan:
         if err != nil {
@@ -140,89 +82,27 @@ for {
 }
 ```
 
-## Response Types
+## Features
 
-### SendResponse
+- ✅ **Type-safe** - Strong typing with Go structs and interfaces
+- ✅ **OpenAI-compatible** - Works with any model supported by Edgee
+- ✅ **Streaming** - Real-time response streaming with channels
+- ✅ **Tool calling** - Full support for function calling
+- ✅ **Flexible input** - Accept strings, InputObject, or maps
+- ✅ **Minimal dependencies** - Uses only standard library and essential packages
 
-```go
-type SendResponse struct {
-    ID      string
-    Object  string
-    Created int64
-    Model   string
-    Choices []ChatCompletionChoice
-    Usage   *Usage
-}
+## Documentation
 
-// Convenience methods for easy access
-func (r *SendResponse) Text() string                   // Shortcut for Choices[0].Message.Content
-func (r *SendResponse) MessageContent() *Message       // Shortcut for Choices[0].Message
-func (r *SendResponse) FinishReason() string           // Shortcut for Choices[0].FinishReason
-func (r *SendResponse) ToolCalls() []ToolCall          // Shortcut for Choices[0].Message.ToolCalls
-```
+For complete documentation, examples, and API reference, visit:
 
-### ChatCompletionChoice
+**👉 [Official Go SDK Documentation](https://www.edgee.cloud/docs/sdk/go)**
 
-```go
-type ChatCompletionChoice struct {
-    Index        int
-    Message      *Message      // For non-streaming responses
-    Delta        *ChatCompletionDelta  // For streaming responses
-    FinishReason *string
-}
-```
-
-### Message
-
-```go
-type Message struct {
-    Role       string
-    Content    string
-    Name       *string
-    ToolCalls  []ToolCall
-    ToolCallID *string
-}
-```
-
-### Usage
-
-```go
-type Usage struct {
-    PromptTokens     int
-    CompletionTokens int
-    TotalTokens      int
-}
-```
-
-### Streaming Response
-
-```go
-type StreamChunk struct {
-    ID      string
-    Object  string
-    Created int64
-    Model   string
-    Choices []ChatCompletionChoice
-}
-
-// Convenience methods for easy access
-func (c *StreamChunk) Text() string           // Shortcut for Choices[0].Delta.Content
-func (c *StreamChunk) Role() string           // Shortcut for Choices[0].Delta.Role
-func (c *StreamChunk) FinishReason() string   // Shortcut for Choices[0].FinishReason
-```
-
-### ChatCompletionDelta
-
-```go
-type ChatCompletionDelta struct {
-    Role      *string     // Only present in first chunk
-    Content   *string
-    ToolCalls []ToolCall
-}
-```
-
-To learn more about this SDK, please refer to the [dedicated documentation](https://www.edgee.cloud/docs/sdk/go).
+The documentation includes:
+- [Configuration guide](https://www.edgee.cloud/docs/sdk/go/configuration) - Multiple ways to configure the SDK
+- [Send method](https://www.edgee.cloud/docs/sdk/go/send) - Complete guide to non-streaming requests
+- [Stream method](https://www.edgee.cloud/docs/sdk/go/stream) - Streaming responses guide
+- [Tools](https://www.edgee.cloud/docs/sdk/go/tools) - Function calling guide
 
 ## License
 
-Apache-2.0
+Licensed under the Apache License, Version 2.0. See [LICENSE](LICENSE) for details.
