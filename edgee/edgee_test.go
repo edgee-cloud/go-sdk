@@ -890,11 +890,13 @@ func TestClient_Stream(t *testing.T) {
 			BaseURL: server.URL,
 		})
 
-		chunkChan, errChan := client.Stream("gpt-4", "Hello")
+		eventChan, errChan := client.Stream("gpt-4", "Hello")
 
 		chunks := []*StreamChunk{}
-		for chunk := range chunkChan {
-			chunks = append(chunks, chunk)
+		for event := range eventChan {
+			if event.Type == StreamEventChunk && event.Chunk != nil {
+				chunks = append(chunks, event.Chunk)
+			}
 		}
 
 		// Check for errors
@@ -945,11 +947,13 @@ func TestClient_Stream(t *testing.T) {
 			},
 		}
 
-		chunkChan, errChan := client.Stream("gpt-4", input)
+		eventChan, errChan := client.Stream("gpt-4", input)
 
 		chunks := []*StreamChunk{}
-		for chunk := range chunkChan {
-			chunks = append(chunks, chunk)
+		for event := range eventChan {
+			if event.Type == StreamEventChunk && event.Chunk != nil {
+				chunks = append(chunks, event.Chunk)
+			}
 		}
 
 		// Check for errors
@@ -981,7 +985,7 @@ func TestClient_Stream(t *testing.T) {
 			BaseURL: server.URL,
 		})
 
-		chunkChan, errChan := client.Stream("gpt-4", "Hello")
+		eventChan, errChan := client.Stream("gpt-4", "Hello")
 
 		// Wait for error
 		err := <-errChan
@@ -993,9 +997,9 @@ func TestClient_Stream(t *testing.T) {
 		}
 
 		// Channel should be closed
-		_, ok := <-chunkChan
+		_, ok := <-eventChan
 		if ok {
-			t.Error("Expected chunk channel to be closed")
+			t.Error("Expected event channel to be closed")
 		}
 	})
 
@@ -1013,11 +1017,13 @@ func TestClient_Stream(t *testing.T) {
 			BaseURL: server.URL,
 		})
 
-		chunkChan, errChan := client.Stream("gpt-4", "Hello")
+		eventChan, errChan := client.Stream("gpt-4", "Hello")
 
 		chunks := []*StreamChunk{}
-		for chunk := range chunkChan {
-			chunks = append(chunks, chunk)
+		for event := range eventChan {
+			if event.Type == StreamEventChunk && event.Chunk != nil {
+				chunks = append(chunks, event.Chunk)
+			}
 		}
 
 		// Check for errors
