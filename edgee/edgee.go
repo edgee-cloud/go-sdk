@@ -59,6 +59,7 @@ type InputObject struct {
 	Messages   []Message `json:"messages"`
 	Tools      []Tool    `json:"tools,omitempty"`
 	ToolChoice any       `json:"tool_choice,omitempty"` // string or object
+	Tags       []string  `json:"tags,omitempty"`
 }
 
 // Request represents the request body for chat completions
@@ -68,6 +69,7 @@ type Request struct {
 	Stream     bool      `json:"stream,omitempty"`
 	Tools      []Tool    `json:"tools,omitempty"`
 	ToolChoice any       `json:"tool_choice,omitempty"`
+	Tags       []string  `json:"tags,omitempty"`
 }
 
 // StreamDelta represents a streaming chunk delta
@@ -293,10 +295,12 @@ func (c *Client) buildRequest(model string, input any, stream bool) (*Request, e
 		req.Messages = v.Messages
 		req.Tools = v.Tools
 		req.ToolChoice = v.ToolChoice
+		req.Tags = v.Tags
 	case *InputObject:
 		req.Messages = v.Messages
 		req.Tools = v.Tools
 		req.ToolChoice = v.ToolChoice
+		req.Tags = v.Tags
 	case map[string]any:
 		// Map input
 		if messages, ok := v["messages"]; ok {
@@ -319,6 +323,17 @@ func (c *Client) buildRequest(model string, input any, stream bool) (*Request, e
 		}
 		if toolChoice, ok := v["tool_choice"]; ok {
 			req.ToolChoice = toolChoice
+		}
+		if tags, ok := v["tags"]; ok {
+			if tagSlice, ok := tags.([]string); ok {
+				req.Tags = tagSlice
+			} else if tagAny, ok := tags.([]any); ok {
+				for _, t := range tagAny {
+					if s, ok := t.(string); ok {
+						req.Tags = append(req.Tags, s)
+					}
+				}
+			}
 		}
 	default:
 		return nil, fmt.Errorf("unsupported input type: %T", input)
